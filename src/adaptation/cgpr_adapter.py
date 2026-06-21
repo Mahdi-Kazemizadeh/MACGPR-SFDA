@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, silhouette_score
 from torch.utils.data import DataLoader, Dataset, Subset
 
+from src.adaptation.reliability import ReliabilityEstimator
 from src.adaptation.losses import AdaptationLosses
 from src.utils.io import ExperimentIO
 from src.utils.metrics import ClassificationMetrics
@@ -64,7 +65,13 @@ class CGPRAdapter:
             "learning_rate": [],
             "iteration_time_seconds": [],
             "selection_score": [],
+            "mean_reliability": [],
+            "reliability_threshold": [],
         }
+        self.reliability_estimator = ReliabilityEstimator(
+            num_classes=self.num_classes,
+            config=self.config,
+        )
 
     def adapt(self) -> dict[str, Any]:
         self.model.to(self.device)
@@ -114,20 +121,48 @@ class CGPRAdapter:
             entropy = self._entropy_numpy(probabilities)
             average_entropy = float(entropy.mean())
 
-            confident_count = int((confidence > threshold).sum())
+            normalized_all_features = self._l2_normalize(features_np)
+            all_clusters = self._cluster_features(normalized_all_features)
+            cluster_refined_all_labels = self._refine_labels_by_cluster(
+                pseudo_labels=pseudo_labels,
+                clusters=all_clusters,
+            )
+
+            reliability_scores = self.reliability_estimator.compute(
+                probabilities=probabilities,
+                features=features_np,
+                pseudo_labels=pseudo_labels,
+                clusters=all_clusters,
+                cluster_refined_labels=cluster_refined_all_labels,
+            )
+
+            reliability_threshold = float(
+                self.adaptation_config.get("reliability", {}).get(
+                    "reliability_threshold",
+                    threshold,
+                )
+            )
+
+            confident_mask = reliability_scores > reliability_threshold
+
             min_confident_samples = int(
                 self.adaptation_config["min_confident_samples"]
             )
 
-            if confident_count < min_confident_samples:
-                threshold = max(0.80, threshold - 0.02)
+            if confident_mask.sum() < min_confident_samples:
+                reliability_threshold = max(0.50, reliability_threshold - 0.05)
+                confident_mask = reliability_scores > reliability_threshold
 
-            confident_mask = confidence > threshold
             coverage = float(confident_mask.mean())
+            mean_reliability = float(
+                reliability_scores[confident_mask].mean()) if confident_mask.sum() > 0 else 0.0
 
             self.history["coverage"].append(coverage)
             self.history["entropy"].append(average_entropy)
             self.history["threshold"].append(round(threshold, 4))
+            self.history["reliability_threshold"].append(
+                round(reliability_threshold, 4))
+            self.history["mean_reliability"].append(mean_reliability)
             self.history["learning_rate"].append(
                 optimizer.param_groups[0]["lr"])
 
@@ -146,13 +181,10 @@ class CGPRAdapter:
             selected_pseudo_labels = pseudo_labels[confident_mask]
             selected_true_labels = true_labels[confident_mask]
 
-            normalized_features = self._l2_normalize(selected_features)
+            normalized_features = normalized_all_features[confident_mask]
 
-            clusters = self._cluster_features(normalized_features)
-            refined_labels = self._refine_labels_by_cluster(
-                pseudo_labels=selected_pseudo_labels,
-                clusters=clusters,
-            )
+            clusters = all_clusters[confident_mask]
+            refined_labels = cluster_refined_all_labels[confident_mask]
 
             label_changes = int(
                 (refined_labels != selected_pseudo_labels).sum())
@@ -202,6 +234,7 @@ class CGPRAdapter:
                 f"Iter {iteration}/{self.adaptation_config['iterations']} | "
                 f"thr={threshold:.3f} | "
                 f"cov={coverage:.3f} | "
+                f"rel={mean_reliability:.3f} | "
                 f"changes={label_changes} | "
                 f"pseudo_err={pseudo_error:.4f} | "
                 f"sil={silhouette if silhouette is not None else 'NA'} | "

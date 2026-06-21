@@ -28,15 +28,22 @@ model:
 
 adaptation:
   method: "CGPR"
-  iterations: 6
+  iterations: 2
   train_epochs_per_iteration: 1
   k_clusters: 12
   initial_threshold: 0.95
   min_confident_samples: 200
   entropy_weight: 0.1
   diversity_weight: 0.1
-  lr_backbone: 0.0001
+  lr_backbone: 0.00001
   revert_threshold: 0.04
+
+reliability:
+  reliability_threshold: 0.75
+  confidence_weight: 0.40
+  entropy_weight: 0.20
+  cluster_weight: 0.25
+  prototype_weight: 0.15
 
 loader:
   batch_size: 64
