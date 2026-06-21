@@ -1,0 +1,42 @@
+seed: 42
+
+dataset:
+  name: "VisDA-C"
+  root_env: "VISDA_ROOT"
+  default_root: "./data/visda-c"
+  source_split: "train"
+  target_split: "validation"
+  num_classes: 12
+  class_names:
+    - aeroplane
+    - bicycle
+    - bus
+    - car
+    - horse
+    - knife
+    - motorcycle
+    - person
+    - plant
+    - skateboard
+    - train
+    - truck
+
+model:
+  backbone: "resnet101"
+  pretrained: true
+  num_classes: 12
+
+training:
+  batch_size: 32
+  num_workers: 0
+  pin_memory: false
+  epochs: 10
+  lr: 0.001
+  momentum: 0.9
+  weight_decay: 0.0001
+  val_ratio: 0.1
+  early_stop_patience: 3
+
+output:
+  checkpoint_dir: "checkpoints"
+  checkpoint_name: "source_model.pth"

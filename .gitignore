@@ -1,0 +1,62 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Datasets
+data/
+datasets/
+visda-c/
+VISDA-C/
+VISDA*/
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Model checkpoints
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+source_model.pth
+
+# Outputs
+outputs/
+results/
+results*/
+runs/
+wandb/
+logs/
+*.log
+
+# Caches
+cache/
+cache_mllm/
+sfda_cache/
+sfda_cache*/
+
+# Large arrays
+*.npy
+*.npz
+
+# Secrets
+.env
+*.key
+*.pem

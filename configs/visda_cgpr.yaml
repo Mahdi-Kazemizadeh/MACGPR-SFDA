@@ -1,0 +1,47 @@
+seed: 42
+
+dataset:
+  name: "VisDA-C"
+  root_env: "VISDA_ROOT"
+  default_root: "./data/visda-c"
+  target_split: "validation"
+  num_classes: 12
+  class_names:
+    - aeroplane
+    - bicycle
+    - bus
+    - car
+    - horse
+    - knife
+    - motorcycle
+    - person
+    - plant
+    - skateboard
+    - train
+    - truck
+
+model:
+  backbone: "resnet101"
+  pretrained: false
+  num_classes: 12
+  checkpoint_path: "checkpoints/source_model.pth"
+
+adaptation:
+  method: "CGPR"
+  iterations: 6
+  train_epochs_per_iteration: 1
+  k_clusters: 12
+  initial_threshold: 0.95
+  min_confident_samples: 200
+  entropy_weight: 0.1
+  diversity_weight: 0.1
+  lr_backbone: 0.0001
+  revert_threshold: 0.04
+
+loader:
+  batch_size: 64
+  num_workers: 0
+  pin_memory: false
+
+output:
+  results_dir: "outputs/cgpr"
