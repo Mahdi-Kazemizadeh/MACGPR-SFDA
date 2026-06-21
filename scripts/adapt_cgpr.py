@@ -95,7 +95,9 @@ def main() -> None:
     print(
         f"Initial source-only accuracy: {metrics['initial_source_only_accuracy']:.4f}")
     print(
-        f"Best adaptation accuracy    : {metrics['best_accuracy_during_adaptation']:.4f}")
+        f"Best debug accuracy         : {metrics['best_debug_accuracy_during_adaptation']:.4f}")
+    print(
+        f"Best unsupervised score     : {metrics['best_unsupervised_selection_score']:.4f}")
     print(f"Final accuracy              : {metrics['accuracy']:.4f}")
     print(
         f"Mean class accuracy         : {metrics['mean_class_accuracy']:.4f}")
