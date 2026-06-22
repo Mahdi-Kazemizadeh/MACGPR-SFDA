@@ -45,6 +45,12 @@ reliability:
   cluster_weight: 0.25
   prototype_weight: 0.15
 
+query_selection:
+  easy_threshold: 0.75
+  hard_lower_threshold: 0.45
+  hard_upper_threshold: 0.75
+  max_hard_ratio: 0.20
+
 loader:
   batch_size: 64
   num_workers: 0
