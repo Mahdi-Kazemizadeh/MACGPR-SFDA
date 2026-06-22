@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, silhouette_score
 from torch.utils.data import DataLoader, Dataset, Subset
 
+from src.adaptation.query_selection import QuerySelector
 from src.adaptation.reliability import ReliabilityEstimator
 from src.adaptation.losses import AdaptationLosses
 from src.utils.io import ExperimentIO
@@ -67,11 +68,16 @@ class CGPRAdapter:
             "selection_score": [],
             "mean_reliability": [],
             "reliability_threshold": [],
+            "easy_count": [],
+            "hard_count": [],
+            "unsafe_count": [],
+            "hard_ratio": [],
         }
         self.reliability_estimator = ReliabilityEstimator(
             num_classes=self.num_classes,
             config=self.config,
         )
+        self.query_selector = QuerySelector(config=self.config)
 
     def adapt(self) -> dict[str, Any]:
         self.model.to(self.device)
@@ -136,6 +142,8 @@ class CGPRAdapter:
                 cluster_refined_labels=cluster_refined_all_labels,
             )
 
+            query_selection = self.query_selector.select(reliability_scores)
+
             reliability_threshold = float(
                 self.adaptation_config.get("reliability", {}).get(
                     "reliability_threshold",
@@ -143,7 +151,7 @@ class CGPRAdapter:
                 )
             )
 
-            confident_mask = reliability_scores > reliability_threshold
+            confident_mask = query_selection.easy_mask.copy()
 
             min_confident_samples = int(
                 self.adaptation_config["min_confident_samples"]
@@ -165,6 +173,12 @@ class CGPRAdapter:
             self.history["mean_reliability"].append(mean_reliability)
             self.history["learning_rate"].append(
                 optimizer.param_groups[0]["lr"])
+            self.history["easy_count"].append(query_selection.easy_count)
+            self.history["hard_count"].append(query_selection.hard_count)
+            self.history["unsafe_count"].append(query_selection.unsafe_count)
+            self.history["hard_ratio"].append(
+                query_selection.hard_count / len(reliability_scores)
+            )
 
             if confident_mask.sum() == 0:
                 current_accuracy = self._evaluate_accuracy(
@@ -235,6 +249,8 @@ class CGPRAdapter:
                 f"thr={threshold:.3f} | "
                 f"cov={coverage:.3f} | "
                 f"rel={mean_reliability:.3f} | "
+                f"easy={query_selection.easy_count} | "
+                f"hard={query_selection.hard_count} | "
                 f"changes={label_changes} | "
                 f"pseudo_err={pseudo_error:.4f} | "
                 f"sil={silhouette if silhouette is not None else 'NA'} | "
