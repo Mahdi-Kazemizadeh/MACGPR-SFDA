@@ -74,6 +74,7 @@ class CGPRAdapter:
             "unsafe_count": [],
             "hard_ratio": [],
             "mllm_query_count": [],
+            "easy_raw_count": [],
         }
         self.reliability_estimator = ReliabilityEstimator(
             num_classes=self.num_classes,
@@ -157,6 +158,12 @@ class CGPRAdapter:
                 reliability_scores=reliability_scores,
             )
 
+            easy_export_info = self.mllm_query_exporter.export_easy_raw(
+                easy_mask=query_selection.easy_mask,
+                pseudo_labels=pseudo_labels,
+                reliability_scores=reliability_scores,
+            )
+
             reliability_threshold = float(
                 self.adaptation_config.get("reliability", {}).get(
                     "reliability_threshold",
@@ -193,6 +200,8 @@ class CGPRAdapter:
                 query_selection.hard_count / len(reliability_scores))
             self.history["mllm_query_count"].append(
                 int(mllm_export_info["num_queries"]))
+            self.history["easy_raw_count"].append(
+                int(easy_export_info["num_easy_samples"]))
 
             if confident_mask.sum() == 0:
                 current_accuracy = self._evaluate_accuracy(
@@ -266,6 +275,7 @@ class CGPRAdapter:
                 f"easy={query_selection.easy_count} | "
                 f"hard={query_selection.hard_count} | "
                 f"mllm_q={mllm_export_info['num_queries']} | "
+                f"easy_raw={easy_export_info['num_easy_samples']} | "
                 f"changes={label_changes} | "
                 f"pseudo_err={pseudo_error:.4f} | "
                 f"sil={silhouette if silhouette is not None else 'NA'} | "

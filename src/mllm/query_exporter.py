@@ -32,6 +32,46 @@ class MLLMQueryExporter:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.sanitized_image_dir.mkdir(parents=True, exist_ok=True)
 
+        self.easy_raw_output_path = self.output_dir / "easy_samples_raw.jsonl"
+
+    def export_easy_raw(
+        self,
+        easy_mask: np.ndarray,
+        pseudo_labels: np.ndarray,
+        reliability_scores: np.ndarray,
+    ) -> dict[str, Any]:
+        """Export easy samples with original paths for internal analysis only."""
+        easy_indices = np.where(easy_mask)[0]
+
+        with open(self.easy_raw_output_path, "w", encoding="utf-8") as file:
+            for index in easy_indices:
+                index = int(index)
+
+                original_image_path, _ = self.target_dataset.samples[index]
+                original_image_path = Path(original_image_path)
+
+                label_index = int(pseudo_labels[index])
+                sample_id = f"target_{index:08d}"
+                reliability_score = float(reliability_scores[index])
+
+                record = {
+                    "sample_id": sample_id,
+                    "target_index": index,
+                    "image_path": str(original_image_path),
+                    "model_label": self.class_names[label_index],
+                    "model_label_index": label_index,
+                    "reliability_score": reliability_score,
+                    "selection_group": "easy",
+                    "export_type": "easy_raw_internal_analysis",
+                }
+
+                file.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+        return {
+            "easy_raw_output_path": str(self.easy_raw_output_path),
+            "num_easy_samples": int(len(easy_indices)),
+        }
+
     def export(
         self,
         hard_mask: np.ndarray,
