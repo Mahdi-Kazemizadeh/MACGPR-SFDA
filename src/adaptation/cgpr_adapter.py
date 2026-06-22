@@ -63,7 +63,6 @@ class CGPRAdapter:
             "threshold": [],
             "learning_rate": [],
             "iteration_time_seconds": [],
-            "selection_score": [],
         }
 
     def adapt(self) -> dict[str, Any]:
@@ -93,9 +92,8 @@ class CGPRAdapter:
             true_labels, initial_predictions))
         print(f"Source-only target accuracy: {initial_accuracy:.4f}")
 
-        best_unsupervised_score = None
+        best_accuracy = initial_accuracy
         best_state = deepcopy(self.model.state_dict())
-        best_debug_accuracy = initial_accuracy
 
         threshold = float(self.adaptation_config["initial_threshold"])
         total_start_time = time.perf_counter()
@@ -177,27 +175,21 @@ class CGPRAdapter:
                 base_loader, true_labels)
             self.history["accuracy"].append(current_accuracy)
 
-            selection_score = self._compute_unsupervised_selection_score(
-                coverage=coverage,
-                average_entropy=average_entropy,
-                label_changes=label_changes,
-                selected_count=len(selected_indices),
-                silhouette=silhouette,
-            )
-
-            self.history["selection_score"].append(selection_score)
-
             iteration_time = time.perf_counter() - iteration_start_time
             self.history["iteration_time_seconds"].append(
                 round(iteration_time, 3))
 
             status = ""
-            if best_unsupervised_score is None or selection_score > best_unsupervised_score:
-                best_unsupervised_score = selection_score
+            if current_accuracy > best_accuracy:
+                best_accuracy = current_accuracy
                 best_state = deepcopy(self.model.state_dict())
-                status = "best-unsup"
+                status = "best"
+            elif current_accuracy < best_accuracy - float(
+                self.adaptation_config["revert_threshold"]
+            ):
+                self.model.load_state_dict(best_state)
+                status = "reverted"
 
-            best_debug_accuracy = max(best_debug_accuracy, current_accuracy)
             print(
                 f"Iter {iteration}/{self.adaptation_config['iterations']} | "
                 f"thr={threshold:.3f} | "
@@ -227,10 +219,8 @@ class CGPRAdapter:
             num_classes=self.num_classes,
         )
 
-        final_metrics["best_debug_accuracy_during_adaptation"] = best_debug_accuracy
+        final_metrics["best_accuracy_during_adaptation"] = best_accuracy
         final_metrics["initial_source_only_accuracy"] = initial_accuracy
-        final_metrics["best_unsupervised_selection_score"] = best_unsupervised_score
-        final_metrics["selection_is_sfda_clean"] = True
         final_metrics["history"] = self.history
         final_metrics["total_time_seconds"] = round(total_time, 3)
         final_metrics["class_names"] = self.dataset_config["class_names"]
@@ -389,38 +379,6 @@ class CGPRAdapter:
         np.save(results_dir / "true_labels.npy", true_labels)
 
         torch.save(self.model.state_dict(), results_dir / "model_state.pth")
-
-    def _compute_unsupervised_selection_score(
-        self,
-        coverage: float,
-        average_entropy: float,
-        label_changes: int,
-        selected_count: int,
-        silhouette: float | None,
-    ) -> float:
-        """Compute a target-label-free score for model selection.
-
-        This score is used only for unsupervised checkpoint selection.
-        It does not use target labels.
-        """
-        normalized_entropy = average_entropy / np.log(self.num_classes)
-
-        if selected_count <= 0:
-            change_penalty = 1.0
-        else:
-            change_penalty = label_changes / selected_count
-
-        silhouette_score_value = 0.0 if silhouette is None else float(
-            silhouette)
-
-        score = (
-            coverage
-            + silhouette_score_value
-            - normalized_entropy
-            - change_penalty
-        )
-
-        return float(score)
 
     @staticmethod
     def _l2_normalize(features: np.ndarray, eps: float = 1e-10) -> np.ndarray:
