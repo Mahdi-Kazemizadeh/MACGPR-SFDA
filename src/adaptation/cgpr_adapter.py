@@ -83,8 +83,7 @@ class CGPRAdapter:
         self.mllm_query_exporter = MLLMQueryExporter(
             target_dataset=self.target_dataset,
             class_names=self.dataset_config["class_names"],
-            output_path=Path(
-                self.output_config["results_dir"]) / "mllm_queries.jsonl",
+            output_dir=Path(self.output_config["results_dir"]),
         )
 
     def adapt(self) -> dict[str, Any]:
