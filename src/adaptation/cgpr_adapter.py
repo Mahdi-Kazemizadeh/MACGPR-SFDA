@@ -11,6 +11,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, silhouette_score
 from torch.utils.data import DataLoader, Dataset, Subset
 
+from src.mllm.query_exporter import MLLMQueryExporter
 from src.adaptation.query_selection import QuerySelector
 from src.adaptation.reliability import ReliabilityEstimator
 from src.adaptation.losses import AdaptationLosses
@@ -72,12 +73,19 @@ class CGPRAdapter:
             "hard_count": [],
             "unsafe_count": [],
             "hard_ratio": [],
+            "mllm_query_count": [],
         }
         self.reliability_estimator = ReliabilityEstimator(
             num_classes=self.num_classes,
             config=self.config,
         )
         self.query_selector = QuerySelector(config=self.config)
+        self.mllm_query_exporter = MLLMQueryExporter(
+            target_dataset=self.target_dataset,
+            class_names=self.dataset_config["class_names"],
+            output_path=Path(
+                self.output_config["results_dir"]) / "mllm_queries.jsonl",
+        )
 
     def adapt(self) -> dict[str, Any]:
         self.model.to(self.device)
@@ -144,6 +152,12 @@ class CGPRAdapter:
 
             query_selection = self.query_selector.select(reliability_scores)
 
+            mllm_export_info = self.mllm_query_exporter.export(
+                hard_mask=query_selection.hard_mask,
+                pseudo_labels=pseudo_labels,
+                reliability_scores=reliability_scores,
+            )
+
             reliability_threshold = float(
                 self.adaptation_config.get("reliability", {}).get(
                     "reliability_threshold",
@@ -177,8 +191,9 @@ class CGPRAdapter:
             self.history["hard_count"].append(query_selection.hard_count)
             self.history["unsafe_count"].append(query_selection.unsafe_count)
             self.history["hard_ratio"].append(
-                query_selection.hard_count / len(reliability_scores)
-            )
+                query_selection.hard_count / len(reliability_scores))
+            self.history["mllm_query_count"].append(
+                int(mllm_export_info["num_queries"]))
 
             if confident_mask.sum() == 0:
                 current_accuracy = self._evaluate_accuracy(
@@ -251,6 +266,7 @@ class CGPRAdapter:
                 f"rel={mean_reliability:.3f} | "
                 f"easy={query_selection.easy_count} | "
                 f"hard={query_selection.hard_count} | "
+                f"mllm_q={mllm_export_info['num_queries']} | "
                 f"changes={label_changes} | "
                 f"pseudo_err={pseudo_error:.4f} | "
                 f"sil={silhouette if silhouette is not None else 'NA'} | "
