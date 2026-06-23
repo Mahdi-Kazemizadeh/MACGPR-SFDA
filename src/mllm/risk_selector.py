@@ -134,7 +134,7 @@ class RiskAwareSelector:
                 and conf >= self.low_confidence
                 and conf < self.high_confidence
                 and ent < self.high_entropy
-                and rel < self.safe_reliability
+                and rel < self.query_reliability
             )
 
             safe_without_mllm = (
