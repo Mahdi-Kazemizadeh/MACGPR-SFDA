@@ -130,11 +130,11 @@ class RiskAwareSelector:
             collapse_sensitive = (
                 collapse_alarm
                 and pseudo in dominant_classes
-                and (
-                    structural_conflict
-                    or rel < self.query_reliability
-                    or ent >= self.high_entropy
-                )
+                and structural_conflict
+                and conf >= self.low_confidence
+                and conf < self.high_confidence
+                and ent < self.high_entropy
+                and rel < self.safe_reliability
             )
 
             safe_without_mllm = (
