@@ -78,6 +78,7 @@ class CGPRAdapter:
             "mllm_query_count": [],
             "easy_raw_count": [],
         }
+
         self.reliability_estimator = ReliabilityEstimator(
             num_classes=self.num_classes,
             config=self.config,
@@ -187,6 +188,12 @@ class CGPRAdapter:
             )
             reason_counts = Counter(risk_selection.reason)
             print(f"Risk reasons: {dict(reason_counts)}")
+
+            query_pseudo_counts = np.bincount(
+                pseudo_labels[risk_selection.query_mask],
+                minlength=self.dataset_config["num_classes"],
+            )
+            print(f"Risk query pseudo counts: {query_pseudo_counts.tolist()}")
 
             query_selection = self.query_selector.select(reliability_scores)
 

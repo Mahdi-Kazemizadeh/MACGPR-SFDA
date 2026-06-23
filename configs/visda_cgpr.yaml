@@ -28,7 +28,7 @@ model:
 
 adaptation:
   method: "CGPR"
-  iterations: 2
+  iterations: 1
   train_epochs_per_iteration: 1
   k_clusters: 12
   initial_threshold: 0.95
