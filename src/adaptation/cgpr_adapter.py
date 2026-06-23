@@ -3,6 +3,7 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from collections import Counter
 
 import numpy as np
 import torch
@@ -11,6 +12,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, silhouette_score
 from torch.utils.data import DataLoader, Dataset, Subset
 
+from src.mllm.risk_selector import RiskAwareSelector
 from src.mllm.query_exporter import MLLMQueryExporter
 from src.adaptation.query_selection import QuerySelector
 from src.adaptation.reliability import ReliabilityEstimator
@@ -86,6 +88,25 @@ class CGPRAdapter:
             class_names=self.dataset_config["class_names"],
             output_dir=Path(self.output_config["results_dir"]),
         )
+        risk_config = config.get("risk_selection", {})
+        self.risk_selector = RiskAwareSelector(
+            num_classes=self.dataset_config["num_classes"],
+            high_confidence=float(risk_config.get("high_confidence", 0.95)),
+            low_confidence=float(risk_config.get("low_confidence", 0.45)),
+            low_entropy=float(risk_config.get("low_entropy", 0.25)),
+            high_entropy=float(risk_config.get("high_entropy", 0.75)),
+            safe_reliability=float(risk_config.get("safe_reliability", 0.95)),
+            query_reliability=float(
+                risk_config.get("query_reliability", 0.80)),
+            min_class_ratio=float(risk_config.get("min_class_ratio", 0.005)),
+            dominant_class_ratio=float(
+                risk_config.get("dominant_class_ratio", 0.18)),
+            prototype_min_count=int(
+                risk_config.get("prototype_min_count", 20)),
+            prototype_reliability_threshold=float(
+                risk_config.get("prototype_reliability_threshold", 0.90)
+            ),
+        )
 
     def adapt(self) -> dict[str, Any]:
         self.model.to(self.device)
@@ -149,11 +170,28 @@ class CGPRAdapter:
                 clusters=all_clusters,
                 cluster_refined_labels=cluster_refined_all_labels,
             )
+            risk_selection = self.risk_selector.select(
+                normalized_features=normalized_all_features,
+                probabilities=probabilities,
+                pseudo_labels=pseudo_labels,
+                reliability_scores=reliability_scores,
+                cluster_labels=all_clusters,
+            )
+            print(
+                "Risk-aware selection | "
+                f"accept={risk_selection.stats['num_accept_without_mllm']} | "
+                f"query_mllm={risk_selection.stats['num_query_mllm']} | "
+                f"hold={risk_selection.stats['num_hold']} | "
+                f"dead_classes={risk_selection.dead_classes} | "
+                f"dominant_classes={risk_selection.dominant_classes}"
+            )
+            reason_counts = Counter(risk_selection.reason)
+            print(f"Risk reasons: {dict(reason_counts)}")
 
             query_selection = self.query_selector.select(reliability_scores)
 
             mllm_export_info = self.mllm_query_exporter.export(
-                hard_mask=query_selection.hard_mask,
+                hard_mask=risk_selection.query_mask,
                 pseudo_labels=pseudo_labels,
                 reliability_scores=reliability_scores,
             )
