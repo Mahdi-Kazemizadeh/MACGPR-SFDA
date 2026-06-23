@@ -194,6 +194,19 @@ class CGPRAdapter:
                 minlength=self.dataset_config["num_classes"],
             )
             print(f"Risk query pseudo counts: {query_pseudo_counts.tolist()}")
+            for target_reason in [
+                "collapse_sensitive_dominant_class",
+                "low_reliability_structural_conflict",
+                "high_confidence_structural_conflict",
+            ]:
+                reason_mask = np.array(
+                    [r == target_reason for r in risk_selection.reason])
+                counts = np.bincount(
+                    pseudo_labels[reason_mask],
+                    minlength=self.dataset_config["num_classes"],
+                )
+                print(
+                    f"Risk reason pseudo counts | {target_reason}: {counts.tolist()}")
 
             query_selection = self.query_selector.select(reliability_scores)
 
