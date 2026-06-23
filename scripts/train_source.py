@@ -4,7 +4,7 @@ from pathlib import Path
 import torch
 
 from src.datamodules.visda_datamodule import VisDADataModule
-from src.models.resnet_classifier import ResNetClassifier
+from src.models.backbone_classifier import build_backbone_classifier
 from src.training.source_trainer import SourceTrainer
 from src.utils.config import ConfigLoader
 from src.utils.seed import SeedManager
@@ -50,9 +50,9 @@ def main() -> None:
         seed=seed,
     )
 
-    model = ResNetClassifier(
+    model = build_backbone_classifier(
+        backbone_name=config["model"]["backbone"],
         num_classes=config["model"]["num_classes"],
-        backbone=config["model"]["backbone"],
         pretrained=config["model"]["pretrained"],
     )
 
