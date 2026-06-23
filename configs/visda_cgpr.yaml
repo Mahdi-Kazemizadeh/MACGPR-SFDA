@@ -51,6 +51,18 @@ adaptation:
     hard_upper_threshold: 0.95
     max_hard_ratio: 0.10
 
+risk_selection:
+  high_confidence: 0.95
+  low_confidence: 0.45
+  low_entropy: 0.25
+  high_entropy: 0.75
+  safe_reliability: 0.95
+  query_reliability: 0.80
+  min_class_ratio: 0.005
+  dominant_class_ratio: 0.18
+  prototype_min_count: 20
+  prototype_reliability_threshold: 0.90
+
 loader:
   batch_size: 64
   num_workers: 0
