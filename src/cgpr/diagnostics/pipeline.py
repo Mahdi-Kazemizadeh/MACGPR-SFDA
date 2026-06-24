@@ -5,6 +5,8 @@ import random
 import numpy as np
 import torch
 
+
+from cgpr.diagnostics.gap_analysis import GapAnalyzer
 from cgpr.diagnostics.audit import AuditEngine
 from cgpr.diagnostics.clustering import ClusterAnalyzer
 from cgpr.diagnostics.config import CapacityAuditConfig
@@ -22,7 +24,8 @@ from cgpr.diagnostics.selection import CapacitySelector
 class CapacityAuditPipeline:
     def __init__(self, config: CapacityAuditConfig):
         self.config = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
 
     def run(self) -> dict:
         self._set_seed()
@@ -83,6 +86,18 @@ class CapacityAuditPipeline:
             selection=selection,
             feature_bank=feature_bank,
             prototype_bank=prototype_bank,
+        )
+
+        GapAnalyzer(
+            config=self.config,
+        ).export(
+            feature_bank=feature_bank,
+            prototype_bank=prototype_bank,
+            clustering=clustering,
+            scores=scores,
+            selection=selection,
+            audit=audit,
+            reaudit=reaudit,
         )
 
         replacement = ReplacementEngine(
