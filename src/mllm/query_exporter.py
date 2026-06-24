@@ -74,11 +74,11 @@ class MLLMQueryExporter:
 
     def export(
         self,
-        hard_mask: np.ndarray,
+        query_mask: np.ndarray,
         pseudo_labels: np.ndarray,
         reliability_scores: np.ndarray,
     ) -> dict[str, Any]:
-        hard_indices = np.where(hard_mask)[0]
+        hard_indices = np.where(query_mask)[0]
 
         with open(self.raw_output_path, "w", encoding="utf-8") as raw_file, open(
             self.sanitized_output_path, "w", encoding="utf-8"

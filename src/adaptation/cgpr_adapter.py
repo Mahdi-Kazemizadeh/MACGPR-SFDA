@@ -211,7 +211,7 @@ class CGPRAdapter:
             query_selection = self.query_selector.select(reliability_scores)
 
             mllm_export_info = self.mllm_query_exporter.export(
-                hard_mask=risk_selection.query_mask,
+                query_mask=risk_selection.query_mask,
                 pseudo_labels=pseudo_labels,
                 reliability_scores=reliability_scores,
             )
