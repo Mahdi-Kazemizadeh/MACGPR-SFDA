@@ -111,7 +111,11 @@ def call_ollama(model: str, prompt: str, image_path: Path) -> str:
         timeout=180,
     )
 
-    response.raise_for_status()
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"Ollama HTTP {response.status_code}: {response.text}"
+        )
+
     data = response.json()
 
     return str(data.get("response", "")).strip()
