@@ -40,20 +40,33 @@ class ClusterDisagreementReAuditor:
             print(f"[WARN] sklearn unavailable for re-audit: {exc}")
             return ReAuditResult(
                 clean=audit.clean,
-                accepted={class_idx: [] for class_idx in range(self.config.num_classes)},
-                rejected={class_idx: [] for class_idx in range(self.config.num_classes)},
-                cluster_reports={class_idx: [] for class_idx in range(self.config.num_classes)},
+                accepted={class_idx: []
+                          for class_idx in range(self.config.num_classes)},
+                rejected={class_idx: []
+                          for class_idx in range(self.config.num_classes)},
+                cluster_reports={class_idx: []
+                                 for class_idx in range(self.config.num_classes)},
             )
 
         features_norm = self._normalize(feature_bank.features)
         prototypes_norm = self._normalize(prototype_bank.prototypes)
 
-        clean = {class_idx: list(audit.clean.get(class_idx, [])) for class_idx in range(self.config.num_classes)}
-        accepted = {class_idx: [] for class_idx in range(self.config.num_classes)}
-        rejected = {class_idx: [] for class_idx in range(self.config.num_classes)}
-        cluster_reports = {class_idx: [] for class_idx in range(self.config.num_classes)}
+        clean = {class_idx: list(audit.clean.get(class_idx, []))
+                 for class_idx in range(self.config.num_classes)}
+        accepted = {class_idx: []
+                    for class_idx in range(self.config.num_classes)}
+        rejected = {class_idx: []
+                    for class_idx in range(self.config.num_classes)}
+        cluster_reports = {class_idx: []
+                           for class_idx in range(self.config.num_classes)}
 
         for class_idx in range(self.config.num_classes):
+            remaining_capacity = self.config.capacity_per_class - \
+                len(clean[class_idx])
+
+            if remaining_capacity <= 0:
+                continue
+
             pool = self._build_pool(
                 class_idx=class_idx,
                 audit=audit,
@@ -63,7 +76,8 @@ class ClusterDisagreementReAuditor:
             if not pool:
                 continue
 
-            pool_indices = np.asarray([int(item["index"]) for item in pool], dtype=np.int64)
+            pool_indices = np.asarray([int(item["index"])
+                                      for item in pool], dtype=np.int64)
 
             if len(pool_indices) < 10:
                 class_accepted, class_rejected = self._small_pool_check(
@@ -73,6 +87,8 @@ class ClusterDisagreementReAuditor:
                     prototypes_norm=prototypes_norm,
                     feature_bank=feature_bank,
                 )
+
+                class_accepted = class_accepted[:remaining_capacity]
 
                 accepted[class_idx].extend(class_accepted)
                 rejected[class_idx].extend(class_rejected)
@@ -100,6 +116,7 @@ class ClusterDisagreementReAuditor:
                 clean=clean,
                 candidates=class_accepted,
             )
+            class_accepted = class_accepted[:remaining_capacity]
 
             accepted[class_idx].extend(class_accepted)
             rejected[class_idx].extend(class_rejected)
@@ -139,6 +156,7 @@ class ClusterDisagreementReAuditor:
         return pool
 
     def _cluster_pool(self, pool_indices: np.ndarray, features_norm: np.ndarray) -> np.ndarray:
+        from sklearn.cluster import MiniBatchKMeans
         k = min(3, max(2, len(pool_indices) // 20))
 
         if len(pool_indices) < k:
@@ -244,18 +262,21 @@ class ClusterDisagreementReAuditor:
                     )
 
                     if metrics["class_prob"] < 0.25:
-                        rejected.append(self._reject_item(item, metrics, "low_class_prob_inside_accepted_subcluster"))
+                        rejected.append(self._reject_item(
+                            item, metrics, "low_class_prob_inside_accepted_subcluster"))
                         continue
 
                     if metrics["proto_sim"] < 0.05:
-                        rejected.append(self._reject_item(item, metrics, "low_proto_sim_inside_accepted_subcluster"))
+                        rejected.append(self._reject_item(
+                            item, metrics, "low_proto_sim_inside_accepted_subcluster"))
                         continue
 
                     record = dict(item)
                     record.update(metrics)
                     record["reaudit_accept_reason"] = "accepted_subcluster"
                     record["subcluster_id"] = int(cluster_id)
-                    record["subcluster_score"] = float(report["subcluster_score"])
+                    record["subcluster_score"] = float(
+                        report["subcluster_score"])
                     accepted.append(record)
             else:
                 for item in cluster_items:
@@ -267,7 +288,8 @@ class ClusterDisagreementReAuditor:
                         prototypes_norm=prototypes_norm,
                         feature_bank=feature_bank,
                     )
-                    rejected.append(self._reject_item(item, metrics, "rejected_subcluster"))
+                    rejected.append(self._reject_item(
+                        item, metrics, "rejected_subcluster"))
 
         accepted = sorted(
             accepted,
@@ -350,7 +372,8 @@ class ClusterDisagreementReAuditor:
         margin = float(sorted_probs[0] - sorted_probs[1])
 
         class_prob = float(feature_bank.probs[sample_idx, class_idx])
-        proto_sim = float(features_norm[sample_idx] @ prototypes_norm[class_idx])
+        proto_sim = float(features_norm[sample_idx]
+                          @ prototypes_norm[class_idx])
         entropy = float(feature_bank.entropy[sample_idx])
 
         rival_probs = feature_bank.probs[sample_idx].copy()
@@ -378,7 +401,8 @@ class ClusterDisagreementReAuditor:
         clean: dict[int, list[dict]],
         candidates: list[dict],
     ) -> list[dict]:
-        clean_indices = {int(item["index"]) for item in clean.get(class_idx, [])}
+        clean_indices = {int(item["index"])
+                         for item in clean.get(class_idx, [])}
         seen = set()
         output = []
 
